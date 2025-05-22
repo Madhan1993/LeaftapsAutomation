@@ -1,0 +1,71 @@
+package utils;
+
+import com.aventstack.extentreports.*;
+import com.aventstack.extentreports.reporter.ExtentSparkReporter;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public class ScenarioManager {
+
+    private static ExtentReports extent;
+    private static ExtentSparkReporter sparkReporter;
+    private static final Map<String, ExtentTest> scenarioMap = new HashMap<>();
+
+    static {
+        sparkReporter = new ExtentSparkReporter("test-output/ExtentReport.html");
+        extent = new ExtentReports();
+        extent.attachReporter(sparkReporter);
+        extent.setSystemInfo("Environment", "QA");
+        extent.setSystemInfo("Executed By", System.getProperty("user.name"));
+    }
+
+    public static ExtentTest createScenario(String scenarioName) {
+        ExtentTest test = extent.createTest(scenarioName);
+        scenarioMap.put(scenarioName, test);
+        return test;
+    }
+
+    public static ExtentTest getScenario(String scenarioName) {
+        return scenarioMap.get(scenarioName);
+    }
+
+    public static void flushReport() {
+        extent.flush();
+    }
+}
+
+package hooks;
+
+import io.cucumber.java.*;
+import utils.ScenarioManager;
+import com.aventstack.extentreports.ExtentTest;
+
+public class Hooks {
+
+    private ExtentTest scenarioTest;
+
+    @Before
+    public void beforeScenario(Scenario scenario) {
+        scenarioTest = ScenarioManager.createScenario(scenario.getName());
+        scenarioTest.info("Starting Scenario: " + scenario.getName());
+    }
+
+    @AfterStep
+    public void afterEachStep(Scenario scenario) {
+        if (scenario.isFailed()) {
+            ScenarioManager.getScenario(scenario.getName())
+                .fail("Step failed in scenario: " + scenario.getName());
+        }
+    }
+
+    @After
+    public void afterScenario(Scenario scenario) {
+        if (scenario.isFailed()) {
+            ScenarioManager.getScenario(scenario.getName()).fail("Scenario failed.");
+        } else {
+            ScenarioManager.getScenario(scenario.getName()).pass("Scenario passed.");
+        }
+        ScenarioManager.flushReport();
+    }
+}
